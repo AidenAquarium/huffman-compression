@@ -54,17 +54,17 @@ huffman/
 - Java
 - A terminal or command prompt
 
-**Compile**<br>
+<br>**Compile**<br>
 From the project root (huffman/), run:<br>
 ```javac -d bin src/*.java```<br>
 
 This compiles the source files into the bin directory.
 
-**Run**<br>
+<br>**Run**<br>
 After compiling, run the program with:<br>
 ```java -cp bin pas.huffman.src.MadZipApp```<br>
 
 This launches the Swing-based GUI for compressing and decompressing files.
 
-**Note**<br>
+<br>**Note**<br>
 - Sample files are available in the examples/ directory for testing.
