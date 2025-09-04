@@ -4,7 +4,7 @@ A file compression utility using Huffman Coding. This project analyzes character
 builds a Huffman tree, and encodes each character with optimized variable-length binary codes.
 
 *This project was completed as a course assignment from Fall Semester 2025, demonstrating practical application of data structures and
-file compression algorithms. Some files were given as a baseline for the project.*
+file compression algorithms. Select files were provided by professors as a skeleton for the project.*
 
 ---
 
@@ -50,21 +50,21 @@ huffman/
 
 ## Setup and Usage
 
-**Requirements**
+### **Requirements**
 - Java
 - A terminal or command prompt
 
-<br>**Compile**<br>
+### **Compile**
 From the project root (huffman/), run:<br>
 ```javac -d bin src/*.java```<br>
 
 This compiles the source files into the bin directory.
 
-<br>**Run**<br>
+### **Run**
 After compiling, run the program with:<br>
 ```java -cp bin pas.huffman.src.MadZipApp```<br>
 
 This launches the Swing-based GUI for compressing and decompressing files.
 
-<br>**Note**<br>
+### **Note**
 - Sample files are available in the examples/ directory for testing.
