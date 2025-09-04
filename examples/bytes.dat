@@ -1,0 +1,204 @@
+ y86_inst_t ins;
+
+    // Initialize the instruction
+    memset( &ins , 0 , sizeof(y86_inst_t) );  // Clear all fields i=on instr.
+    ins.type = INVALID;   // Invalid instruction until proven otherwise
+
+    // Check to Ensure that the current instruction is within range of memory and memory !NULL
+    if (cpu->pc >= MEMSIZE || memory == NULL) {
+        cpu->stat = ADR;
+        return ins;
+    }
+
+    // Get the Instruction Code (First Byte)
+    ins.opcode = memory[cpu->pc];
+
+    // Switch for the first nibble
+    switch((ins.opcode >> 4)) {
+        case 0x0: // Case HALT
+            if ((ins.opcode & 0xF)) {cpu->stat = INS; return ins;} // If the second nibble != F, it's invalid
+
+            // Set Values accordingly
+            ins.size = 1;
+            ins.type = HALT;
+            break;
+
+        case 0x1: // Case NOP
+        if ((ins.opcode & 0xF)) {cpu->stat = INS; return ins;} // Second Nibble Check
+
+            // Value Set
+            ins.size = 1;
+            ins.type = NOP;
+            break;
+
+        case 0x2: // Case CMOV Some type
+
+            switch (ins.opcode & 0xF) { // Switch for Types of CMOVS
+                case 0x0: ins.cmov = RRMOVQ; break;
+                case 0x1: ins.cmov = CMOVLE; break;
+                case 0x2: ins.cmov = CMOVL; break;
+                case 0x3: ins.cmov = CMOVE; break;
+                case 0x4: ins.cmov = CMOVNE; break;
+                case 0x5: ins.cmov = CMOVGE; break;
+                case 0x6: ins.cmov = CMOVG; break;
+                default: ins.cmov = BADCMOV; cpu->stat = INS; return ins; // If bad cmov, set cmov to bad cmov, stat to ins, and return
+            }
+
+            // Ensure Memory Usage is inrange
+            ins.size = 2;
+            if ((cpu->pc + ins.size) >= MEMSIZE) {cpu->stat = ADR; return ins;}
+
+            // Set the registers A(first bool value) and B(second bool value)
+            if (!setRegister(cpu, memory[(cpu->pc) + 1], &ins.ra, &ins.rb, false, false))
+                return ins; // Returns if any register is invalid (also sets stat to INS in the function)
+
+            // Value Set
+            ins.type = CMOV;
+            break;
+
+        case 0x3: // Case IRMOVQ
+            if ((ins.opcode & 0xF || (cpu->pc + 1) >= MEMSIZE)) {cpu->stat = INS; return ins;} // Second Nibble Check
+
+            // Memory Range Check
+            ins.size = 10;
+            if ((cpu->pc + ins.size) >= MEMSIZE) {cpu->stat = ADR; return ins;}
+
+            // Register Set, Ensure A is 0xF(first bool value) and B is any valid register
+            if (!setRegister(cpu, memory[(cpu->pc) + 1], &ins.ra, &ins.rb, true, false))
+                return ins;
+
+            // Value Set
+            ins.type = IRMOVQ;
+            ins.value = *((int64_t*)(memory + cpu->pc + 2));
+            break;
+
+        case 0x4: // Case RMMOVQ
+            if ((ins.opcode & 0xF)) {cpu->stat = INS; return ins;} // Second Nibble Check
+
+            // Memory Range Check
+            ins.size = 10;
+            if ((cpu->pc + ins.size) >= MEMSIZE) {cpu->stat = ADR; return ins;}
+
+            // Set Registers
+            if (!setRegister(cpu, memory[(cpu->pc) + 1], &ins.ra, &ins.rb, false, false))
+                return ins;
+
+            // Value Set
+            ins.type = RMMOVQ;
+            ins.d = *((int64_t*) (memory + cpu->pc + 2));
+            break;
+
+        case 0x5: // Case MRMOVQ
+            if ((ins.opcode & 0xF)) {cpu->stat = INS; return ins;}
+
+            ins.size = 10;
+            if ((cpu->pc + ins.size) >= MEMSIZE) {cpu->stat = ADR; return ins;}
+            if (!setRegister(cpu, memory[(cpu->pc) + 1], &ins.ra, &ins.rb, false, false))
+                return ins;
+
+            ins.type = MRMOVQ;
+            ins.d = *((int64_t*) (memory + cpu->pc + 2));
+            break;
+
+        case 0x6: // Case OPQ
+
+            switch(ins.opcode & 0xF) { // Switch for all OPs
+                case 0x0: ins.op = ADD; break;
+                case 0x1: ins.op = SUB; break;
+                case 0x2: ins.op = AND; break;
+                case 0x3: ins.op = XOR; break;
+                default: ins.op = BADOP; cpu->stat = INS; return ins;
+            }
+
+            ins.size = 2;
+            if ((cpu->pc + ins.size) >= MEMSIZE) {cpu->stat = ADR; return ins;}
+            if (!setRegister(cpu, memory[(cpu->pc) + 1], &ins.ra, &ins.rb, false, false))
+                return ins;
+
+            ins.type = OPQ;
+            break;
+
+        case 0x7: // Case Jump
+
+            switch (ins.opcode & 0xF) { // Switch for all Jump values
+                case 0x0: ins.jump = JMP; break;
+                case 0x1: ins.jump = JLE; break;
+                case 0x2: ins.jump = JL; break;
+                case 0x3: ins.jump = JE; break;
+                case 0x4: ins.jump = JNE; break;
+                case 0x5: ins.jump = JGE; break;
+                case 0x6: ins.jump = JG; break;
+                default: ins.jump = BADJUMP; cpu->stat = INS; return ins;
+            }
+
+            // Memory Range Check and Usage
+            ins.size = 9;
+            if ((cpu->pc + ins.size) >= MEMSIZE) {cpu->stat = ADR; return ins;}
+            ins.dest = *((uint64_t*) (memory + cpu->pc + 1));
+
+            ins.type = JUMP;
+            break;
+
+        case 0x8: // Case Call
+            if ((ins.opcode & 0xF)) {cpu->stat = INS; return ins;}
+
+            // Memory Range Check + Usage
+            ins.size = 9;
+            if ((cpu->pc + ins.size) >= MEMSIZE) {cpu->stat = ADR; return ins;}
+            ins.dest = *((uint64_t*) (memory + cpu->pc + 1));
+
+            ins.type = CALL;
+            break;
+
+        case 0x9: // Case Ret
+            if ((ins.opcode & 0xF)) {cpu->stat = INS; return ins;}
+
+            ins.size = 1;
+            ins.type = RET;
+            break;
+
+        case 0xA: // Case PUSHQ
+            if ((ins.opcode & 0xF)) {cpu->stat = INS; return ins;}
+
+            ins.size = 2;
+            if ((cpu->pc + ins.size) >= MEMSIZE) {cpu->stat = ADR; return ins;}
+
+            if (!setRegister(cpu, memory[(cpu->pc) + 1], &ins.ra, &ins.rb, false, true))
+                return ins;
+
+            ins.type = PUSHQ;
+            break;
+
+        case 0xB: // Case POPQ
+            if ((ins.opcode & 0xF)) {cpu->stat = INS; return ins;}
+
+            ins.size = 2;
+            if ((cpu->pc + ins.size) >= MEMSIZE) {cpu->stat = ADR; return ins;}
+
+            if (!setRegister(cpu, memory[(cpu->pc) + 1], &ins.ra, &ins.rb, false, true))
+                return ins;
+
+            ins.type = POPQ;
+            break;
+
+        default: // ANY INVALID
+            cpu->stat = INS;
+            break;
+    }
+    return ins;
+}
+
+bool setRegister(y86_t *cpu, uint8_t byte, y86_rnum_t *regOne, y86_rnum_t *regTwo, bool checkFOne, bool checkFTwo) {
+    uint8_t nibbleOne = byte >> 4; // Holds the first target register
+    uint8_t nibbleTwo = byte & 0xF; // Holds the second target register
+
+    // If a reg must be F (checkF{One/Two} is true) and isn't, or a the register is out of range, return false and set stat to INS;
+    if ( ( (checkFOne && (nibbleOne != 0xF)) || (!checkFOne && nibbleOne == BADREG) )
+        || ((checkFTwo && (nibbleTwo != 0xF))) || (!checkFTwo && nibbleTwo == BADREG)) {
+        cpu->stat = INS;
+        return false;
+    }
+
+    // If the registers are valid, set both of them
+    *regOne = nibbleOne;
+    *regTwo = nibbleTwo;
